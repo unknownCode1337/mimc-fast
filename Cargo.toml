@@ -3,9 +3,11 @@ name = "mimc-fast"
 version = "0.1.0"
 authors = ["Alex Gajewski <agajews@gmail.com>"]
 edition = "2018"
+default-run = "server"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+# log = "0.4.11"
 lazy_static = "1.4.0"
 bigint = "4.4.3"
 rocket = "0.4.5"
@@ -13,4 +15,7 @@ rocket_contrib = "0.4.5"
 rocket_cors = "0.5.1"
 serde = { version = "1.0.116", features = ["derive"] }
 rayon = "1.1"
-# log = "0.4.11"
+
+[[bin]]
+name = "server"
+path = "src/bin/server.rs"
