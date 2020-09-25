@@ -1,5 +1,6 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 #![feature(test)]
+#![allow(non_snake_case)]
 
 #[macro_use]
 extern crate rocket;
@@ -459,13 +460,15 @@ fn main() {
 }
 
 trait MiningPattern {
-    fn next(&self, fromChunk: &ChunkFootprint, chunkSideLength: u16) -> ChunkFootprint;
+    fn next(&self, fromChunk: &ChunkFootprint) -> ChunkFootprint;
 }
 
 struct SpiralMiner {
     currentChunk: ChunkFootprint,
     pattern: Spiral,
 }
+
+#[allow(unused)]
 impl SpiralMiner {
     fn new(center: Coords, chunkSideLength: u16) -> Self {
         let currentChunk = ChunkFootprint {
@@ -483,9 +486,7 @@ impl SpiralMiner {
 impl Iterator for SpiralMiner {
     type Item = ChunkFootprint;
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self
-            .pattern
-            .next(&self.currentChunk, self.currentChunk.sideLength as u16);
+        let next = self.pattern.next(&self.currentChunk);
         self.currentChunk = next.clone();
         Some(next)
     }
@@ -495,6 +496,8 @@ struct Spiral {
     chunkSideLength: u16,
     fromChunk: ChunkFootprint,
 }
+
+#[allow(unused)]
 impl Spiral {
     fn new(center: &Coords, chunkSideLength: u16) -> Self {
         //floor by default?
@@ -520,7 +523,7 @@ impl Spiral {
     }
 }
 impl MiningPattern for Spiral {
-    fn next(&self, chunk: &ChunkFootprint, chunkSideLength: u16) -> ChunkFootprint {
+    fn next(&self, chunk: &ChunkFootprint) -> ChunkFootprint {
         let homeX = self.fromChunk.bottomLeft.x;
         let homeY = self.fromChunk.bottomLeft.y;
         let currX = chunk.bottomLeft.x;
@@ -631,11 +634,11 @@ mod tests {
             sideLength: chunkSideLength as i64,
         };
         let spiral = Spiral::new(&center, chunkSideLength);
-        let first = spiral.next(&start, chunkSideLength);
-        let second = spiral.next(&first, chunkSideLength);
-        let third = spiral.next(&second, chunkSideLength);
-        let fourth = spiral.next(&third, chunkSideLength);
-        let fifth = spiral.next(&fourth, chunkSideLength);
+        let first = spiral.next(&start);
+        let second = spiral.next(&first);
+        let third = spiral.next(&second);
+        let fourth = spiral.next(&third);
+        let fifth = spiral.next(&fourth);
 
         assert_eq!(
             first,
@@ -703,11 +706,11 @@ mod tests {
             sideLength: chunkSideLength as i64,
         };
         let spiral = Spiral::new(&center, chunkSideLength);
-        let first = spiral.next(&start, chunkSideLength);
-        let second = spiral.next(&first, chunkSideLength);
-        let third = spiral.next(&second, chunkSideLength);
-        let fourth = spiral.next(&third, chunkSideLength);
-        let fifth = spiral.next(&fourth, chunkSideLength);
+        let first = spiral.next(&start);
+        let second = spiral.next(&first);
+        let third = spiral.next(&second);
+        let fourth = spiral.next(&third);
+        let fifth = spiral.next(&fourth);
 
         assert_eq!(
             first,
@@ -776,7 +779,7 @@ mod tests {
         b.iter(|| {
             let n = test::black_box(1000);
 
-            for i in 0..n {
+            for _i in 0..n {
                 let _ = miner.next().unwrap();
             }
         })
@@ -791,7 +794,7 @@ mod tests {
         b.iter(|| {
             let n = test::black_box(1000);
 
-            for i in 0..n {
+            for _i in 0..n {
                 let _ = miner.next().unwrap();
             }
         })
@@ -806,7 +809,7 @@ mod tests {
         b.iter(|| {
             let n = test::black_box(1000);
 
-            for i in 0..n {
+            for _i in 0..n {
                 let _ = miner.next().unwrap();
             }
         })
