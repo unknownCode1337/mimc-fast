@@ -625,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    fn sixteen_bench() {
+    fn sixteen() {
         let chunkSideLength = 16;
         let center = Coords { x: 0, y: 0 };
 
@@ -771,15 +771,15 @@ mod tests {
     extern crate test;
     use test::Bencher;
     #[bench]
-    fn sixteen(b: &mut Bencher) {
+    fn sixteen_bench(b: &mut Bencher) {
         let center = Coords { x: 0, y: 0 };
         let chunkSideLength = 16;
         let mut miner = SpiralMiner::new(center, chunkSideLength);
 
         b.iter(|| {
-            let n = test::black_box(1000);
+            let n = test::black_box(100000);
 
-            for _i in 0..n {
+            for i in 0..n {
                 let _ = miner.next().unwrap();
             }
         })
@@ -792,9 +792,9 @@ mod tests {
         let mut miner = SpiralMiner::new(center, chunkSideLength);
 
         b.iter(|| {
-            let n = test::black_box(1000);
+            let n = test::black_box(100000);
 
-            for _i in 0..n {
+            for i in 0..n {
                 let _ = miner.next().unwrap();
             }
         })
@@ -807,9 +807,39 @@ mod tests {
         let mut miner = SpiralMiner::new(center, chunkSideLength);
 
         b.iter(|| {
-            let n = test::black_box(1000);
+            let n = test::black_box(100000);
 
-            for _i in 0..n {
+            for i in 0..n {
+                let _ = miner.next().unwrap();
+            }
+        })
+    }
+
+    #[bench]
+    fn onetwentyeigth_bench(b: &mut Bencher) {
+        let center = Coords { x: 0, y: 0 };
+        let chunkSideLength = 128;
+        let mut miner = SpiralMiner::new(center, chunkSideLength);
+
+        b.iter(|| {
+            let n = test::black_box(100000);
+
+            for i in 0..n {
+                let _ = miner.next().unwrap();
+            }
+        })
+    }
+
+    #[bench]
+    fn twofiftysix_bench(b: &mut Bencher) {
+        let center = Coords { x: 0, y: 0 };
+        let chunkSideLength = 256;
+        let mut miner = SpiralMiner::new(center, chunkSideLength);
+
+        b.iter(|| {
+            let n = test::black_box(100000);
+
+            for i in 0..n {
                 let _ = miner.next().unwrap();
             }
         })
