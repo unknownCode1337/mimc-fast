@@ -7,31 +7,32 @@ use rayon::prelude::*;
 use std::time::Instant;
 
 const PLANET_RARITY: u32 = 16384;
+const N: usize = 100;
+const CHUNK_SIDE_LENGTH: u16 = 16;
+const CENTER: Coords = Coords { x: 0, y: 0 };
 
 fn main() {
-    const N: usize = 100;
-
-    let center = Coords { x: 0, y: 0 };
-    let chunkSideLength: u16 = 16;
-
-    let mut miner = SpiralMiner::new(center, chunkSideLength);
+    let mut miner = SpiralMiner::new(CENTER, CHUNK_SIDE_LENGTH);
 
     // preallocate?
-    let mut results: Vec<(Vec<Planet>, u64)> = vec![];
-    let exp: u64 = (chunkSideLength * chunkSideLength).into();
+    let mut results: Vec<(Vec<Planet>, u32)> = vec![];
+    let exp: f32 = (CHUNK_SIDE_LENGTH * CHUNK_SIDE_LENGTH).into();
+
     for _ in 0..N {
         let nextChunk = miner.next().unwrap();
         let now = Instant::now();
         let res = mine(nextChunk);
 
         // this.hashRate = chunk.chunkFootprint.sideLength ** 2 / (miningTimeMillis / 1000);
-        let rate = exp / (now.elapsed().as_millis() as u64 / 1000u64);
+        let elapsed = now.elapsed().as_millis() as f32 / 1000f32;
+        let rate = (exp / elapsed) as u32;
 
         let tup = (res, rate);
         results.push(tup);
     }
 
-    print!("{:?}", results);
+    let avg = results.iter().map(|res| res.1 as u64).sum::<u64>() / results.len() as u64;
+    println!("{:?}", avg);
 }
 
 fn mine(chunkFootprint: ChunkFootprint) -> Vec<Planet> {
