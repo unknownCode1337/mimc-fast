@@ -1,4 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
+#![feature(test)]
 
 #[macro_use]
 extern crate rocket;
@@ -6,20 +7,25 @@ extern crate rocket;
 #[macro_use]
 extern crate lazy_static;
 
+// #[macro_use]
+// extern crate log;
+
 use bigint::U512;
 
-use serde::{Serialize, Deserialize};
 use rocket_contrib::json::Json;
+use serde::{Deserialize, Serialize};
 
 use rayon::prelude::*;
 
 use rocket::http::Method;
-use rocket_cors::{AllowedHeaders, AllowedOrigins, catch_all_options_routes};
+use rocket_cors::{catch_all_options_routes, AllowedHeaders, AllowedOrigins};
 
 lazy_static! {
-    static ref P: U512 = U512::from_dec_str("21888242871839275222246405745257275088548364400416034343698204186575808495617").unwrap();
+    static ref P: U512 = U512::from_dec_str(
+        "21888242871839275222246405745257275088548364400416034343698204186575808495617"
+    )
+    .unwrap();
     static ref C: Vec<PrimeElem> = {
-
         let consts = vec![
             "0",
             "7120861356467848435263064379192047478074060781135320967663101236819528304084",
@@ -242,9 +248,12 @@ lazy_static! {
             "2119542016932434047340813757208803962484943912710204325088879681995922344971",
             "0",
         ];
-        consts.into_iter().map(|c| PrimeElem { x: U512::from_dec_str(c).unwrap() })
+        consts
+            .into_iter()
+            .map(|c| PrimeElem {
+                x: U512::from_dec_str(c).unwrap(),
+            })
             .collect::<Vec<_>>()
-
     };
 }
 
@@ -315,18 +324,20 @@ impl MimcState {
     }
 
     fn sponge(inputs: Vec<i64>, n_outputs: usize, rounds: usize) -> Vec<PrimeElem> {
-        let inputs = inputs.into_iter()
+        let inputs = inputs
+            .into_iter()
             .map(|x| {
                 let bigx = if x < 0 {
-                    let (diff, overflowed) = P.overflowing_sub(
-                        U512::from_big_endian(&((-x).to_be_bytes())));
+                    let (diff, overflowed) =
+                        P.overflowing_sub(U512::from_big_endian(&((-x).to_be_bytes())));
                     assert!(!overflowed);
                     diff
                 } else {
                     U512::from_big_endian(&x.to_be_bytes())
                 };
                 PrimeElem { x: bigx }
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
         let mut state = MimcState::new(rounds, PrimeElem::zero());
         for elt in inputs {
             state.inject(&elt);
@@ -341,27 +352,27 @@ impl MimcState {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct Coords {
     x: i64,
     y: i64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Planet {
     coords: Coords,
     hash: String,
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct ChunkFootprint {
     bottomLeft: Coords,
     sideLength: i64,
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Task {
     chunkFootprint: ChunkFootprint,
     planetRarity: u32,
@@ -374,8 +385,19 @@ struct Response {
     planetLocations: Vec<Planet>,
 }
 
+#[get("/")]
+fn hello() -> &'static str {
+    "Hello, world!"
+}
+
 #[post("/mine", data = "<task>")]
 fn mine(task: Json<Task>) -> Json<Response> {
+    // info_!("{:?}", task);
+    // Info: Json(Task { chunkFootprint: ChunkFootprint { bottomLeft: Coords { x: -15456, y: 18944 }, sideLength: 32 }, planetRarity: 16384 })
+    // Info: Json(Task { chunkFootprint: ChunkFootprint { bottomLeft: Coords { x: -15456, y: 18912 }, sideLength: 32 }, planetRarity: 16384 })
+    // Info: Json(Task { chunkFootprint: ChunkFootprint { bottomLeft: Coords { x: -15456, y: 18880 }, sideLength: 32 }, planetRarity: 16384 })
+    // Info: Json(Task { chunkFootprint: ChunkFootprint { bottomLeft: Coords { x: -15456, y: 18848 }, sideLength: 32 }, planetRarity: 16384 })
+
     let x = task.chunkFootprint.bottomLeft.x;
     let y = task.chunkFootprint.bottomLeft.y;
     let size = task.chunkFootprint.sideLength;
@@ -383,19 +405,23 @@ fn mine(task: Json<Task>) -> Json<Response> {
     let (threshold, overflowed) = P.overflowing_div(U512::from(task.planetRarity));
     assert!(!overflowed);
 
-    let planets = (x..(x + size)).into_par_iter().map(|xi| {
-        let mut planets = Vec::new();
-        for yi in y..(y + size) {
-            let hash = MimcState::sponge(vec![xi, yi], 1, 220)[0].x;
-            if hash < threshold {
-                planets.push(Planet {
-                    coords: Coords { x: xi, y: yi },
-                    hash: hash.to_string(),
-                });
+    let planets = (x..(x + size))
+        .into_par_iter()
+        .map(|xi| {
+            let mut planets = Vec::new();
+            for yi in y..(y + size) {
+                let hash = MimcState::sponge(vec![xi, yi], 1, 220)[0].x;
+                if hash < threshold {
+                    planets.push(Planet {
+                        coords: Coords { x: xi, y: yi },
+                        hash: hash.to_string(),
+                    });
+                }
             }
-        }
-        planets
-    }).flatten().collect::<Vec<_>>();
+            planets
+        })
+        .flatten()
+        .collect::<Vec<_>>();
 
     Json(Response {
         chunkFootprint: task.chunkFootprint.clone(),
@@ -420,8 +446,421 @@ fn main() {
         allow_credentials: true,
         ..Default::default()
     }
-    .to_cors().unwrap();
+    .to_cors()
+    .unwrap();
     let options_routes = catch_all_options_routes();
 
-    rocket::ignite().mount("/", routes![mine]).mount("/", options_routes).manage(cors.clone()).attach(cors).launch();
+    rocket::ignite()
+        .mount("/", routes![mine, hello])
+        .mount("/", options_routes)
+        .manage(cors.clone())
+        .attach(cors)
+        .launch();
 }
+
+trait MiningPattern {
+    fn next(&self, fromChunk: &ChunkFootprint, chunkSideLength: u16) -> ChunkFootprint;
+}
+
+struct SpiralMiner {
+    currentChunk: ChunkFootprint,
+    pattern: Spiral,
+}
+impl SpiralMiner {
+    fn new(center: Coords, chunkSideLength: u16) -> Self {
+        let currentChunk = ChunkFootprint {
+            bottomLeft: center.clone(),
+            sideLength: chunkSideLength as i64,
+        };
+        let pattern = Spiral::new(&center, chunkSideLength);
+
+        Self {
+            currentChunk,
+            pattern,
+        }
+    }
+}
+impl Iterator for SpiralMiner {
+    type Item = ChunkFootprint;
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self
+            .pattern
+            .next(&self.currentChunk, self.currentChunk.sideLength as u16);
+        self.currentChunk = next.clone();
+        Some(next)
+    }
+}
+
+struct Spiral {
+    chunkSideLength: u16,
+    fromChunk: ChunkFootprint,
+}
+impl Spiral {
+    fn new(center: &Coords, chunkSideLength: u16) -> Self {
+        //floor by default?
+
+        let length = i64::from(chunkSideLength);
+
+        let bottomLeftX = (center.x / length) * length;
+        let bottomLeftY = (center.y / length) * length;
+        let bottomLeft = Coords {
+            x: bottomLeftX,
+            y: bottomLeftY,
+        };
+
+        let fromChunk = ChunkFootprint {
+            bottomLeft,
+            sideLength: length,
+        };
+
+        Self {
+            fromChunk,
+            chunkSideLength,
+        }
+    }
+}
+impl MiningPattern for Spiral {
+    fn next(&self, chunk: &ChunkFootprint, chunkSideLength: u16) -> ChunkFootprint {
+        let homeX = self.fromChunk.bottomLeft.x;
+        let homeY = self.fromChunk.bottomLeft.y;
+        let currX = chunk.bottomLeft.x;
+        let currY = chunk.bottomLeft.y;
+
+        let mut nextBottomLeft = Coords { x: currX, y: currY };
+
+        let length = i64::from(self.chunkSideLength);
+
+        if currX == homeX && currY == homeY {
+            nextBottomLeft.y = homeY + length;
+        } else if currY - currX > homeY - homeX && currY + currX >= homeX + homeY {
+            if currY + currX == homeX + homeY {
+                // break the circle
+                nextBottomLeft.y = currY + length;
+            } else {
+                nextBottomLeft.x = currX + length;
+            }
+        } else if currX + currY > homeX + homeY && currY - currX <= homeY - homeX {
+            nextBottomLeft.y = currY - length;
+        } else if currX + currY <= homeX + homeY && currY - currX < homeY - homeX {
+            nextBottomLeft.x = currX - length;
+        } else {
+            // if (currX + currY < homeX + homeY && currY - currX >= homeY - homeX)
+            nextBottomLeft.y = currY + length;
+        }
+
+        ChunkFootprint {
+            bottomLeft: nextBottomLeft,
+            sideLength: length,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sixteen_iter() {
+        let center = Coords { x: 0, y: 0 };
+        let chunkSideLength = 16;
+        let mut miner = SpiralMiner::new(center, chunkSideLength);
+
+        assert_eq!(
+            miner.next(),
+            Some(ChunkFootprint {
+                bottomLeft: Coords {
+                    x: 0,
+                    y: chunkSideLength as i64,
+                },
+                sideLength: chunkSideLength as i64
+            })
+        );
+
+        assert_eq!(
+            miner.next(),
+            Some(ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: chunkSideLength as i64,
+                },
+                sideLength: chunkSideLength as i64
+            })
+        );
+
+        assert_eq!(
+            miner.next(),
+            Some(ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: 0,
+                },
+                sideLength: chunkSideLength as i64
+            })
+        );
+
+        assert_eq!(
+            miner.next(),
+            Some(ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: -(chunkSideLength as i64),
+                },
+                sideLength: chunkSideLength as i64
+            })
+        );
+
+        assert_eq!(
+            miner.next(),
+            Some(ChunkFootprint {
+                bottomLeft: Coords {
+                    x: 0,
+                    y: -(chunkSideLength as i64),
+                },
+                sideLength: chunkSideLength as i64
+            })
+        );
+    }
+
+    #[test]
+    fn sixteen_bench() {
+        let chunkSideLength = 16;
+        let center = Coords { x: 0, y: 0 };
+
+        let start = ChunkFootprint {
+            bottomLeft: center.clone(),
+            sideLength: chunkSideLength as i64,
+        };
+        let spiral = Spiral::new(&center, chunkSideLength);
+        let first = spiral.next(&start, chunkSideLength);
+        let second = spiral.next(&first, chunkSideLength);
+        let third = spiral.next(&second, chunkSideLength);
+        let fourth = spiral.next(&third, chunkSideLength);
+        let fifth = spiral.next(&fourth, chunkSideLength);
+
+        assert_eq!(
+            first,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: 0,
+                    y: chunkSideLength as i64,
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            second,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: chunkSideLength as i64,
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            third,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: 0,
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            fourth,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: -(chunkSideLength as i64),
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            fifth,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: 0,
+                    y: -(chunkSideLength as i64),
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+    }
+
+    #[test]
+    fn thirtytwo() {
+        let chunkSideLength = 32;
+        let center = Coords { x: 0, y: 0 };
+
+        let start = ChunkFootprint {
+            bottomLeft: center.clone(),
+            sideLength: chunkSideLength as i64,
+        };
+        let spiral = Spiral::new(&center, chunkSideLength);
+        let first = spiral.next(&start, chunkSideLength);
+        let second = spiral.next(&first, chunkSideLength);
+        let third = spiral.next(&second, chunkSideLength);
+        let fourth = spiral.next(&third, chunkSideLength);
+        let fifth = spiral.next(&fourth, chunkSideLength);
+
+        assert_eq!(
+            first,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: 0,
+                    y: chunkSideLength as i64,
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            second,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: chunkSideLength as i64,
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            third,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: 0,
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            fourth,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: chunkSideLength as i64,
+                    y: -(chunkSideLength as i64),
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+
+        assert_eq!(
+            fifth,
+            ChunkFootprint {
+                bottomLeft: Coords {
+                    x: 0,
+                    y: -(chunkSideLength as i64),
+                },
+                sideLength: chunkSideLength as i64
+            }
+        );
+    }
+
+    extern crate test;
+    use test::Bencher;
+    #[bench]
+    fn sixteen(b: &mut Bencher) {
+        let center = Coords { x: 0, y: 0 };
+        let chunkSideLength = 16;
+        let mut miner = SpiralMiner::new(center, chunkSideLength);
+
+        b.iter(|| {
+            let n = test::black_box(1000);
+
+            for i in 0..n {
+                let _ = miner.next().unwrap();
+            }
+        })
+    }
+
+    #[bench]
+    fn thirtytwo_bench(b: &mut Bencher) {
+        let center = Coords { x: 0, y: 0 };
+        let chunkSideLength = 32;
+        let mut miner = SpiralMiner::new(center, chunkSideLength);
+
+        b.iter(|| {
+            let n = test::black_box(1000);
+
+            for i in 0..n {
+                let _ = miner.next().unwrap();
+            }
+        })
+    }
+
+    #[bench]
+    fn sixtyfour_bench(b: &mut Bencher) {
+        let center = Coords { x: 0, y: 0 };
+        let chunkSideLength = 64;
+        let mut miner = SpiralMiner::new(center, chunkSideLength);
+
+        b.iter(|| {
+            let n = test::black_box(1000);
+
+            for i in 0..n {
+                let _ = miner.next().unwrap();
+            }
+        })
+    }
+}
+
+// private async nextValidExploreTarget(
+//     chunkLocation: ChunkFootprint,
+//     jobId: number
+//   ): Promise<ChunkFootprint | null> {
+//     // returns the first valid chunk equal to or after `chunk` (in the explore order of mining pattern) that hasn't been explored
+//     // async because it may take indefinitely long to find the next target. this will block UI if done sync
+//     // we use this trick to promisify:
+//     // https://stackoverflow.com/questions/10344498/best-way-to-iterate-over-an-array-without-blocking-the-ui/10344560#10344560
+
+//     // this function may return null if user chooses to stop exploring or changes mining pattern in the middle of its resolution
+//     // so any function calling it should handle the null case appropriately
+//     let candidateChunk = chunkLocation;
+//     let count = 10000;
+//     while (!this.isValidExploreTarget(candidateChunk) && count > 0) {
+//       candidateChunk = this.miningPattern.nextChunk(candidateChunk);
+//       count -= 1;
+//     }
+//     // since user might have switched jobs or stopped exploring during the above loop
+//     if (!this.isExploring && jobId !== this.currentJobId) {
+//       return null;
+//     }
+//     if (this.isValidExploreTarget(candidateChunk)) {
+//       return candidateChunk;
+//     }
+//     return new Promise((resolve) => {
+//       setTimeout(async () => {
+//         const nextNextChunk = await this.nextValidExploreTarget(
+//           candidateChunk,
+//           jobId
+//         );
+//         resolve(nextNextChunk);
+//       }, 0);
+//     });
+//   }
+
+//   private exploreNext(fromChunk: ChunkFootprint, jobId: number) {
+//     this.nextValidExploreTarget(fromChunk, jobId).then(
+//       (nextChunk: ChunkFootprint | null) => {
+//         if (!!nextChunk) {
+//           const nextChunkKey = this.chunkLocationToKey(nextChunk, jobId);
+//           this.exploringChunk[nextChunkKey] = {
+//             chunkFootprint: nextChunk,
+//             planetLocations: [],
+//           };
+//           this.exploringChunkStart[nextChunkKey] = Date.now();
+//           this.minersComplete[nextChunkKey] = 0;
+//           this.sendMessageToWorkers(nextChunk, jobId);
+//         }
+//       }
+//     );
+//   }
