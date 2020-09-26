@@ -1,12 +1,16 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
 // use log;
+use itertools::iproduct;
 use rayon::prelude::*;
 use rocket::http::Method;
 use rocket::{get, post, routes};
 use rocket_contrib::json::Json;
 use rocket_cors::{catch_all_options_routes, AllowedHeaders, AllowedOrigins};
 use serde::{Deserialize, Serialize};
+
+use rayon::iter::ParallelBridge;
+use rayon::prelude::ParallelIterator;
 
 use mimc_fast::game::*;
 use mimc_fast::mimc::*;
@@ -45,13 +49,10 @@ fn mine(task: Json<Task>) -> Json<Response> {
     let (threshold, overflowed) = MimcState::rarity(task.planetRarity);
     assert!(!overflowed);
 
-    let range: Vec<(i64, i64)> = (x..(x + size))
-        .map(|xi| (y..(y + size)).map(move |yi| (xi, yi)))
-        .flatten()
-        .collect();
+    let range = iproduct!(x..(x + size), y..(y + size));
 
     let planets = range
-        .into_par_iter()
+        .par_bridge()
         .filter_map(|(xi, yi)| {
             let hash = MimcState::sponge(&[xi, yi], 220);
             if hash < threshold {
