@@ -45,11 +45,13 @@ fn mine(task: Json<Task>) -> Json<Response> {
     let (threshold, overflowed) = MimcState::rarity(task.planetRarity);
     assert!(!overflowed);
 
-    let xrange: Vec<i64> = (x..(x + size)).map(|n| n).collect();
-    let yrange: Vec<i64> = (y..(y + size)).map(|n| n).collect();
-    let planets = xrange
+    let range: Vec<(i64, i64)> = (x..(x + size))
+        .map(|xi| (y..(y + size)).map(move |yi| (xi, yi)))
+        .flatten()
+        .collect();
+
+    let planets = range
         .into_par_iter()
-        .zip(yrange.into_par_iter())
         .filter_map(|(xi, yi)| {
             let hash = MimcState::sponge(&[xi, yi], 220);
             if hash < threshold {
@@ -61,7 +63,7 @@ fn mine(task: Json<Task>) -> Json<Response> {
                 None
             }
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<Planet>>();
 
     Json(Response {
         chunkFootprint: task.chunkFootprint.clone(),
