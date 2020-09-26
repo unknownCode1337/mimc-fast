@@ -52,22 +52,21 @@ fn mine(chunkFootprint: ChunkFootprint) -> Vec<Planet2> {
     let (threshold, overflowed) = MimcState::rarity(PLANET_RARITY);
     assert!(!overflowed);
 
-    let planets = (x..(x + size))
-        .into_par_iter()
-        .map(|xi| {
-            let mut planets = Vec::new();
-            for yi in y..(y + size) {
-                let hash = MimcState::sponge(&[xi, yi], 220);
-                if hash < threshold {
-                    planets.push(Planet2 {
-                        coords: Coords { x: xi, y: yi },
-                        hash,
-                    });
-                }
+    let xrange = x..(x + size);
+    let yrange = y..(y + size);
+    let planets = xrange
+        .zip(yrange)
+        .filter_map(|(xi, yi)| {
+            let hash = MimcState::sponge(&[xi, yi], 220);
+            if hash < threshold {
+                Some(Planet2 {
+                    coords: Coords { x: xi, y: yi },
+                    hash,
+                })
+            } else {
+                None
             }
-            planets
         })
-        .flatten()
         .collect::<Vec<_>>();
 
     planets

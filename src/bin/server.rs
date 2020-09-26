@@ -1,7 +1,7 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
 // use log;
-use rayon::prelude::*;
+// use rayon::prelude::*;
 use rocket::http::Method;
 use rocket::{get, post, routes};
 use rocket_contrib::json::Json;
@@ -45,22 +45,21 @@ fn mine(task: Json<Task>) -> Json<Response> {
     let (threshold, overflowed) = MimcState::rarity(task.planetRarity);
     assert!(!overflowed);
 
-    let planets = (x..(x + size))
-        .into_par_iter()
-        .map(|xi| {
-            let mut planets = Vec::new();
-            for yi in y..(y + size) {
-                let hash = MimcState::sponge(&[xi, yi], 220);
-                if hash < threshold {
-                    planets.push(Planet {
-                        coords: Coords { x: xi, y: yi },
-                        hash: hash.to_string(),
-                    });
-                }
+    let xrange = x..(x + size);
+    let yrange = y..(y + size);
+    let planets = xrange
+        .zip(yrange)
+        .filter_map(|(xi, yi)| {
+            let hash = MimcState::sponge(&[xi, yi], 220);
+            if hash < threshold {
+                Some(Planet {
+                    coords: Coords { x: xi, y: yi },
+                    hash: hash.to_string(),
+                })
+            } else {
+                None
             }
-            planets
         })
-        .flatten()
         .collect::<Vec<_>>();
 
     Json(Response {
