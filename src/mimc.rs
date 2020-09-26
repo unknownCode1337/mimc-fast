@@ -1,4 +1,3 @@
-
 use bigint::U512;
 use lazy_static::lazy_static;
 
@@ -309,11 +308,13 @@ impl MimcState {
         self.r = t.fifth_power().plus(&self.r);
     }
 
-    pub fn sponge(inputs: Vec<i64>, n_outputs: usize, rounds: usize) -> Vec<PrimeElem> {
-        let inputs = inputs
+    pub fn sponge(inputs: &[i64], rounds: usize) -> bigint::U512 {
+        let mut state = MimcState::new(rounds, PrimeElem::zero());
+
+        inputs
             .into_iter()
             .map(|x| {
-                let bigx = if x < 0 {
+                let bigx = if *x < 0 {
                     let (diff, overflowed) =
                         P.overflowing_sub(U512::from_big_endian(&((-x).to_be_bytes())));
                     assert!(!overflowed);
@@ -323,17 +324,11 @@ impl MimcState {
                 };
                 PrimeElem { x: bigx }
             })
-            .collect::<Vec<_>>();
-        let mut state = MimcState::new(rounds, PrimeElem::zero());
-        for elt in inputs {
-            state.inject(&elt);
-            state.mix();
-        }
-        let mut outputs = vec![state.l.clone()];
-        for _ in 1..n_outputs {
-            state.mix();
-            outputs.push(state.l.clone());
-        }
-        outputs
+            .for_each(|elt| {
+                state.inject(&elt);
+                state.mix();
+            });
+
+        state.l.x
     }
 }

@@ -50,7 +50,7 @@ fn mine(task: Json<Task>) -> Json<Response> {
         .map(|xi| {
             let mut planets = Vec::new();
             for yi in y..(y + size) {
-                let hash = MimcState::sponge(vec![xi, yi], 1, 220)[0].x;
+                let hash = MimcState::sponge(&[xi, yi], 220);
                 if hash < threshold {
                     planets.push(Planet {
                         coords: Coords { x: xi, y: yi },
