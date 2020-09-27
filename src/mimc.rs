@@ -1,5 +1,9 @@
 use bigint::U512;
 use lazy_static::lazy_static;
+use std::ops::Add;
+use std::ops::Mul;
+use std::ops::Rem;
+use std::ops::Sub;
 
 lazy_static! {
     static ref P: U512 = U512::from_dec_str(
@@ -245,19 +249,15 @@ pub struct PrimeElem {
 
 impl PrimeElem {
     fn plus(&self, rhs: &PrimeElem) -> PrimeElem {
-        let (sum, overflowed) = self.x.overflowing_add(rhs.x);
-        assert!(!overflowed);
-        let (res, overflowed) = sum.overflowing_rem(*P);
-        assert!(!overflowed);
-        PrimeElem { x: res }
+        let sum = self.x.add(rhs.x);
+        let x = sum.rem(*P);
+        PrimeElem { x }
     }
 
     fn times(&self, rhs: &PrimeElem) -> PrimeElem {
-        let (prod, overflowed) = self.x.overflowing_mul(rhs.x);
-        assert!(!overflowed);
-        let (res, overflowed) = prod.overflowing_rem(*P);
-        assert!(!overflowed);
-        PrimeElem { x: res }
+        let prod = self.x.mul(rhs.x);
+        let x = prod.rem(*P);
+        PrimeElem { x }
     }
 
     fn fifth_power(&self) -> PrimeElem {
@@ -284,7 +284,7 @@ impl MimcState {
     }
 
     fn new(rounds: usize, k: PrimeElem) -> MimcState {
-        assert!(rounds <= C.len());
+        debug_assert!(rounds <= C.len());
         MimcState {
             l: PrimeElem::zero(),
             r: PrimeElem::zero(),
@@ -315,10 +315,7 @@ impl MimcState {
             .into_iter()
             .map(|x| {
                 let bigx = if *x < 0 {
-                    let (diff, overflowed) =
-                        P.overflowing_sub(U512::from_big_endian(&((-x).to_be_bytes())));
-                    assert!(!overflowed);
-                    diff
+                    P.sub(U512::from_big_endian(&((-x).to_be_bytes())))
                 } else {
                     U512::from_big_endian(&x.to_be_bytes())
                 };

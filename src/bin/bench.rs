@@ -24,7 +24,7 @@ fn mine(chunkLength: u16) {
     let explorer = SpiralMiner::new(CENTER, chunkLength);
 
     let (threshold, overflowed) = MimcState::rarity(PLANET_RARITY);
-    assert!(!overflowed);
+    debug_assert!(!overflowed);
 
     let now = Instant::now();
 

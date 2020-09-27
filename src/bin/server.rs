@@ -41,7 +41,7 @@ fn mine(task: Json<Task>) -> Json<Response> {
     let size = task.chunkFootprint.sideLength;
 
     let (threshold, overflowed) = MimcState::rarity(task.planetRarity);
-    assert!(!overflowed);
+    debug_assert!(!overflowed);
 
     let planets = iproduct!(x..(x + size), y..(y + size))
         .par_bridge()
