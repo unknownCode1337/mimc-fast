@@ -332,7 +332,7 @@ impl MimcState {
                 };
                 PrimeElem { x: bigx }
             }).collect::<Vec<_>>();
-        let mut state = MimcState::new(rounds, PrimeElem::zero());
+        let mut state = MimcState::new(rounds, PrimeElem { x: U512::from(5) });
         for elt in inputs {
             state.inject(&elt);
             state.mix();
